@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Tracker</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .header { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid #dee2e6; margin-bottom: 30px; }
+        .category-icon { width: 100px; height: 100px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: white; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin: 10px; cursor: pointer; transition: transform 0.2s; border: 2px solid transparent; }
+        .category-icon:hover { transform: translateY(-5px); border-color: #0d6efd; }
+        .category-icon.active { border-color: #0d6efd; background-color: #e7f1ff; }
+        .category-icon i { font-size: 2rem; color: #0d6efd; }
+        .category-name { font-weight: bold; margin-top: 5px; text-align: center; font-size: 0.9rem; width: 90%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .task-card { background: white; border-radius: 10px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-left: 5px solid #0d6efd; position: relative; }
+        .task-card.task-done { background: #e9ecef; opacity: 0.6; border-left-color: #6c757d; }
+        .task-card.task-done h5 { text-decoration: line-through; color: #6c757d; }
+        .task-priority-1 { border-left-color: #198754; }
+        .task-priority-2 { border-left-color: #ffc107; }
+        .task-priority-3 { border-left-color: #dc3545; }
+        .sort-btn { padding: 5px 15px; border-radius: 20px; font-size: 0.85rem; font-weight: 500; margin-left: 10px; border: 1px solid #dee2e6; background: white; color: #6c757d; transition: all 0.2s; }
+        .sort-btn.active { background: #0d6efd; color: white; border-color: #0d6efd; }
+        .add-btn { font-size: 1.5rem; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+        /* Remove arrow from dropdown button */
+        .dropdown-toggle::after { display: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1 class="mb-0">Task Tracker</h1>
+        <div class="dropdown">
+            <button class="btn btn-primary add-btn dropdown-toggle" type="button" id="addMenu" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-plus-lg"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="addMenu">
+                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#categoryModal">Create Category</a></li>
+                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#taskModal" onclick="populateCategoryDropdown()">Create Task</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="mb-5">
+        <h3>Categories</h3>
+        <div id="categoryContainer" class="d-flex flex-wrap">
+            <!-- Categories will be loaded here -->
+        </div>
+    </div>
+
+    <div class="mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="mb-0">Tasks</h3>
+            <div class="d-flex align-items-center">
+                <span class="text-muted small">Sort by:</span>
+                <button class="sort-btn active" id="sort-priority" onclick="sortTasks('priority')">Priority</button>
+                <button class="sort-btn" id="sort-deadline" onclick="sortTasks('deadline')">Deadline</button>
+            </div>
+        </div>
+        <div id="taskContainer">
+            <!-- Tasks will be loaded here -->
+        </div>
+    </div>
+</div>
+
+<!-- Category Modal -->
+<div class="modal fade" id="categoryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">New Category</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="categoryForm">
+                    <div class="mb-3">
+                        <label class="form-label">Name *</label>
+                        <input type="text" id="catName" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea id="catDescription" class="form-control"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="createCategory()">Create</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task Modal -->
+<div class="modal fade" id="taskModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">New Task</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="taskForm">
+                    <div class="mb-3">
+                        <label class="form-label">Name *</label>
+                        <input type="text" id="taskName" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea id="taskDescription" class="form-control"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Due Date *</label>
+                        <input type="datetime-local" id="taskDueDate" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Priority *</label>
+                        <select id="taskPriority" class="form-select" required>
+                            <option value="1">Low</option>
+                            <option value="2" selected>Medium</option>
+                            <option value="3">High</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Collection *</label>
+                        <select id="taskCategory" class="form-select" required>
+                            <!-- Loaded from API -->
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="createTask()">Create</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    let currentCategoryId = null;
+    let currentSortBy = 'priority';
+
+    async function loadData() {
+        await fetchCategories();
+        await fetchTasks();
+    }
+
+    async function fetchCategories() {
+        try {
+            const response = await fetch('/categories');
+            const categories = await response.json();
+            const container = document.getElementById('categoryContainer');
+            if (Array.isArray(categories)) {
+                let html = `
+                    <div class="category-icon ${currentCategoryId === null ? 'active' : ''}" onclick="filterTasks(null)" title="Show all tasks">
+                        <i class="bi bi-grid-fill"></i>
+                        <div class="category-name">All Tasks</div>
+                    </div>
+                `;
+                html += categories.map(cat => `
+                    <div class="category-icon ${currentCategoryId === cat.id ? 'active' : ''}" 
+                         onclick="filterTasks(${cat.id})" 
+                         title="${cat.description || ''}">
+                        <div class="position-relative w-100 h-100 d-flex flex-column align-items-center justify-content-center">
+                            <i class="bi bi-folder2"></i>
+                            <div class="category-name">${cat.name}</div>
+                            <button class="btn btn-link text-danger position-absolute top-0 end-0 p-1" 
+                                    onclick="event.stopPropagation(); deleteCategory(${cat.id})" 
+                                    title="Delete category">
+                                <i class="bi bi-x-circle" style="font-size: 1rem;"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+                container.innerHTML = html;
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function filterTasks(categoryId) {
+        currentCategoryId = categoryId;
+        await fetchCategories(); // Refresh categories to show active state
+        await fetchTasks(currentCategoryId, currentSortBy);
+    }
+
+    async function sortTasks(sortBy) {
+        currentSortBy = sortBy;
+        // Update UI
+        document.querySelectorAll('.sort-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`sort-${sortBy}`).classList.add('active');
+        await fetchTasks(currentCategoryId, sortBy);
+    }
+
+    async function fetchTasks(categoryId = null, sortBy = 'priority') {
+        try {
+            let url = `/tasks?sort_by=${sortBy}`;
+            if (categoryId) {
+                url += `&category_id=${categoryId}`;
+            }
+            const response = await fetch(url);
+            const tasks = await response.json();
+            const container = document.getElementById('taskContainer');
+            if (Array.isArray(tasks)) {
+                const now = new Date();
+                container.innerHTML = tasks.map(task => {
+                    const isOverdue = task.deadline && new Date(task.deadline) < now && !task.status;
+                    return `
+                    <div class="task-card task-priority-${task.priority} ${task.status ? 'task-done' : ''}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="d-flex align-items-start">
+                                <div class="form-check me-3 mt-1">
+                                    <input class="form-check-input" type="checkbox" ${task.status ? 'checked' : ''} 
+                                           onclick="toggleTaskStatus(${task.id})">
+                                </div>
+                                <div>
+                                    <h5 class="mb-1">${task.title}</h5>
+                                    <p class="text-muted small mb-1">${task.description || ''}</p>
+                                    <div class="${isOverdue ? 'text-danger' : 'text-secondary'} small">
+                                        <i class="bi bi-calendar-event"></i> ${task.deadline ? new Date(task.deadline).toLocaleString() : 'No deadline'}
+                                    </div>
+                                </div>
+                            </div>
+                            <span class="badge ${task.status ? 'bg-success' : 'bg-warning text-dark'}">
+                                ${task.status ? 'Completed' : 'In Progress'}
+                            </span>
+                        </div>
+                    </div>
+                `;}).join('');
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function toggleTaskStatus(taskId) {
+        try {
+            const response = await fetch(`/tasks/${taskId}/toggle`, {
+                method: 'PATCH'
+            });
+            if (response.ok) {
+                fetchTasks(currentCategoryId, currentSortBy);
+            } else {
+                const errorData = await response.json();
+                alert('Error updating task status: ' + (errorData.detail || response.statusText));
+                // Refresh tasks to sync with server in case of discrepancy
+                fetchTasks(currentCategoryId, currentSortBy);
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function populateCategoryDropdown() {
+        try {
+            const response = await fetch('/categories');
+            const categories = await response.json();
+            const select = document.getElementById('taskCategory');
+            if (Array.isArray(categories)) {
+                select.innerHTML = '<option value="" disabled selected>Select a collection</option>' + 
+                    categories.map(cat => `<option value="${cat.id}">${cat.name}</option>`).join('');
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function createCategory() {
+        const name = document.getElementById('catName').value;
+        const description = document.getElementById('catDescription').value;
+        if (!name) return alert('Name is required');
+
+        try {
+            const response = await fetch('/categories', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ name, description })
+            });
+            if (response.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('categoryModal')).hide();
+                document.getElementById('categoryForm').reset();
+                fetchCategories();
+            } else {
+                alert('Error creating category');
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function deleteCategory(id) {
+        if (!confirm('Are you sure you want to delete this category? (It must be empty)')) return;
+        try {
+            const response = await fetch(`/categories/${id}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) {
+                if (currentCategoryId === id) currentCategoryId = null;
+                loadData();
+            } else {
+                const errorData = await response.json();
+                alert('Error: ' + (errorData.detail || response.statusText));
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function createTask() {
+        const title = document.getElementById('taskName').value;
+        const description = document.getElementById('taskDescription').value;
+        const deadline = document.getElementById('taskDueDate').value;
+        const priority = document.getElementById('taskPriority').value;
+        const category_id = document.getElementById('taskCategory').value;
+
+        if (!title || !deadline || !priority || !category_id) return alert('Please fill required fields');
+
+        try {
+            const response = await fetch('/tasks', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    title, description, deadline, priority: parseInt(priority), category_id: parseInt(category_id)
+                })
+            });
+            if (response.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('taskModal')).hide();
+                document.getElementById('taskForm').reset();
+                fetchTasks(currentCategoryId, currentSortBy); // Maintain current filter and sort
+            } else {
+                alert('Error creating task');
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadData);
+</script>
+</body>
+</html>

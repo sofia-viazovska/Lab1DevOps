@@ -1,0 +1,16 @@
+[Unit]
+Description=Daily Task Tracker Service
+After=network.target postgresql.service
+
+[Service]
+User=app
+Group=app
+WorkingDirectory=/opt/mywebapp
+# Migration before each run
+ExecStartPre=/usr/bin/python3 -m scripts.migration
+# Port 3000 according to variant V5=3
+ExecStart=/usr/bin/python3 -m uvicorn app.main:app --host 127.0.0.1 --port 3000
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
