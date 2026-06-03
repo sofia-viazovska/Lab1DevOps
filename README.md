@@ -1,93 +1,200 @@
-# Lab 1: Web Application Deployment & Automation
+# Лабораторна робота №1 — Розгортання Web-сервісу з автоматизацією
 
-Цей проект є веб-застосунком для відстеження щоденних завдань (Daily Task Tracker), реалізованим на базі FastAPI. Проект включає автоматизацію розгортання, конфігурацію бази даних PostgreSQL, Nginx як reverse proxy та управління сервісом через systemd.
+Веб-застосунок `mywebapp` (Task Tracker) із автоматизованим розгортанням на
+віртуальній машині під Linux. Архітектура:
 
-## Функціональність
+```
+client → nginx (:80) → uvicorn/FastAPI (127.0.0.1:3000) → PostgreSQL (127.0.0.1:5432)
+```
 
-- **Управління категоріями**: Створення, перегляд та видалення категорій завдань.
-- **Управління завданнями**: Створення завдань з пріоритетом, дедлайном та описом.
-- **Стан здоров'я**: Ендпоінти `/health/alive` та `/health/ready` для моніторингу.
-- **Гнучкий інтерфейс**: Підтримка `application/json` та `text/html` залежно від заголовка `Accept`.
-- **Автоматизація**: Повний цикл розгортання одним скриптом.
+## Варіант індивідуального завдання
 
-## Вимоги
+Розрахунок виконано за номером залікової книжки `N = 3697`:
 
-- Linux (Ubuntu/Debian рекомендовано)
-- Python 3.8+
-- PostgreSQL
-- Nginx
-- Sudo права для користувача, що виконує розгортання
+| Формула           | Значення | Сенс                                                |
+|-------------------|----------|-----------------------------------------------------|
+| `V2 = N % 2 + 1`  | **2**    | Конфігурація через файл `/etc/mywebapp/config.yaml`; СУБД — **PostgreSQL** |
+| `V3 = N % 3 + 1`  | **2**    | Тематика — **Task Tracker**                         |
+| `V5 = N % 5 + 1`  | **3**    | Порт застосунку — **3000**                          |
 
-## Як запустити (Розгортання)
+### Бізнес-логіка (V3 = 2, Task Tracker)
 
-1. Клонуйте репозиторій на віртуальну машину.
-2. Перейдіть в директорію проекту.
-3. Запустіть скрипт автоматичного встановлення:
-   ```bash
-   chmod +x scripts/deploy.sh
-   ./scripts/deploy.sh
-   ```
-   *Примітка: Скрипт попросить пароль sudo для встановлення пакетів та створення користувачів.*
+Об'єкт `Task` містить рівно поля, які вимагає умова: `id`, `title`, `status`,
+`created_at`. API:
 
-Скрипт виконає наступні дії:
-- Встановить необхідні пакети (`python3-pip`, `postgresql`, `nginx`).
-- Створить системних користувачів (`student`, `teacher`, `app`, `operator`).
-- Налаштує базу даних PostgreSQL.
-- Скопіює конфігурації та встановить systemd-сервіс `mywebapp.service`.
-- Налаштує Nginx.
-- Створить файл `/home/student/gradebook` з номером варіанту.
-- Запустить сервіс.
+| Метод | URL                  | Опис                                                            |
+|-------|----------------------|-----------------------------------------------------------------|
+| GET   | `/tasks`             | Список усіх задач (`id`, `title`, `status`, `created_at`)       |
+| POST  | `/tasks`             | Створити нову задачу. Тіло: `{"title": "..."}`                  |
+| POST  | `/tasks/<id>/done`   | Позначити задачу як виконану                                    |
+| GET   | `/`                  | Plain HTML-список бізнес-ендпоінтів (приймає тільки `text/html`)|
+| GET   | `/health/alive`      | Завжди `200 OK` (для liveness-проб)                             |
+| GET   | `/health/ready`      | `200 OK` якщо БД доступна, інакше `500` із описом проблеми       |
 
-## Локальний запуск та розробка
+Усі ендпоінти, які повертають бізнес-дані, поважають заголовок `Accept`:
 
-Якщо ви хочете запустити застосунок вручну (наприклад, для розробки або тестування без повного розгортання через systemd):
+* `application/json` (за замовчуванням) → JSON
+* `text/html` → проста HTML-сторінка **без CSS та JS**; списки рендеряться у
+  вигляді HTML-таблиць (як вимагає умова).
 
-1. **Скопіюйте файли на сервер/VM** (якщо ви працюєте віддалено):
-   ```bash
-   # Приклад для Docker
-   docker cp ./Lab1DevOps/. lab1-vm:/home/student/
-   
-   # Приклад через SCP
-   scp -r ./Lab1DevOps student@your-vm-ip:/home/student/
-   ```
+`/health/*` назовні через nginx **не пропускаються** — вимога умови щодо того,
+що nginx віддає лише кореневий ендпоінт і бізнес-ендпоінти.
 
-2. **Встановіть залежності**:
-   ```bash
-   pip3 install -r requirements.txt
-   ```
+### Приклади запитів
 
-3. **Запустіть застосунок**:
-   ```bash
-   export PYTHONPATH=$PYTHONPATH:.
-   python3 -m uvicorn app.main:app --host 0.0.0.0 --port 3000
-   ```
-   *Доступ до БД у такому випадку буде здійснюватися через SQLite (test.db), якщо не налаштовано `config.yaml`.*
+```bash
+# JSON
+curl http://<vm-ip>/tasks
+curl -X POST http://<vm-ip>/tasks -H 'Content-Type: application/json' \
+     -d '{"title": "buy milk"}'
+curl -X POST http://<vm-ip>/tasks/1/done
 
-## Використання
+# HTML
+curl -H 'Accept: text/html' http://<vm-ip>/
+curl -H 'Accept: text/html' http://<vm-ip>/tasks
+```
 
-Після успішного розгортання застосунок буде доступний на порту 80 (через Nginx).
+## Розробка
 
-### Основні ендпоінти:
-- `GET /` — Головна сторінка зі списком усіх бізнес-ендпоінтів.
-- `GET /tasks` — Список завдань. Підтримує заголовок `Accept: text/html` (повертає таблицю) або `Accept: application/json`.
-- `GET /categories` — Список категорій. Підтримує `Accept: text/html` або `Accept: application/json`.
-- `GET /health/alive` — Перевірка стану (завжди 200 OK з вмістом "OK").
-- `GET /health/ready` — Перевірка готовності (повертає 200 OK, якщо є підключення до БД, інакше 500).
+Вимоги: Python 3.10+, локальний PostgreSQL.
 
-### Користувачі в системі:
-- **student / teacher**: Пароль за замовчуванням `12345678` (потрібно змінити при першому вході). Мають `sudo` права.
-- **operator**: Пароль `12345678`. Має обмежені права `sudo` на керування сервісом `mywebapp` та перезавантаження `nginx`.
-- **app**: Системний користувач для роботи застосунку (без права входу).
+```bash
+git clone <repo>
+cd Lab1DevOps
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
 
-## Що було зроблено (Технічні деталі)
+# Конфіг для локального запуску
+cat > /tmp/mywebapp.yaml <<'EOF'
+database_url: "postgresql+psycopg2://user:password@127.0.0.1:5432/mywebapp_dev"
+EOF
 
-1. **Веб-застосунок**: Реалізовано на FastAPI. Використовує SQLAlchemy для роботи з БД.
-2. **База даних**: PostgreSQL для зберігання завдань та категорій.
-3. **Міграції**: Скрипт `scripts/migration.py` автоматично створює таблиці та індекси, а також додає відсутні колонки. Запускається автоматично перед стартом сервісу через `ExecStartPre` в systemd unit.
-4. **Systemd**: Застосунок працює як сервіс `mywebapp`. Налаштовано перезапуск при збоях, роботу від імені користувача `app` та підтримку **Systemd Socket Activation**.
-5. **Reverse Proxy**: Nginx налаштований на проксіювання запитів з порту 80 на внутрішній порт застосунку (3000). Логи записів ведуться в `/var/log/nginx/mywebapp_access.log`.
-6. **Безпека**: 
-   - Обмеження прав для користувача `app`.
-   - Налаштування `sudoers` для користувача `operator`.
-   - Блокування дефолтного користувача (опціонально в скрипті).
-7. **Формати відповідей**: Реалізовано логіку перевірки заголовка `Accept` для віддачі чистого HTML (таблиці) або JSON даних.
+# Запуск міграції та сервера
+APP_CONFIG_PATH=/tmp/mywebapp.yaml python -m scripts.migration
+APP_CONFIG_PATH=/tmp/mywebapp.yaml python -m uvicorn app.main:app \
+    --host 127.0.0.1 --port 3000
+```
+
+## Розгортання
+
+### Базовий образ ВМ
+
+Використовується офіційний образ
+[**Ubuntu Server 22.04 LTS**](https://ubuntu.com/download/server) (підійде також
+24.04 LTS). На VirtualBox/VMware/UTM/Proxmox/Hyper-V/Multipass — рівноцінно.
+
+### Вимоги до ресурсів
+
+| Ресурс | Мінімум | Рекомендовано |
+|--------|---------|---------------|
+| CPU    | 1 vCPU  | 2 vCPU        |
+| RAM    | 1 GiB   | 2 GiB         |
+| Disk   | 10 GiB  | 20 GiB        |
+
+Особливих налаштувань при встановленні ОС не потрібно: одна розбивка диску за
+замовчуванням, OpenSSH-сервер вмикається у Subiquity-інсталяторі.
+
+### Перший вхід
+
+Після встановлення Ubuntu вхід виконується під дефолтним cloud-користувачем
+(`ubuntu` або тим, якого ви вказали в інсталяторі) через **SSH** або
+**console**. Credentials — ті, що ви задали в інсталяторі.
+
+> Після виконання `deploy.sh` цей дефолтний користувач буде **заблокований**, і
+> вхід можливий тільки під `student`/`teacher`/`operator` (пароль за
+> замовчуванням `12345678`, ОС вимагатиме його змінити при першому вході).
+
+### Запуск автоматизації
+
+```bash
+# На свіжій ВМ під дефолтним користувачем:
+git clone <repo-url> Lab1DevOps
+cd Lab1DevOps
+sudo bash scripts/deploy.sh
+```
+
+Скрипт виконує всі вісім пунктів умови:
+
+1. встановлює пакети (`python3`, `postgresql`, `nginx`, …);
+2. створює користувачів `student`, `teacher`, `app`, `operator`;
+3. створює БД `mywebapp` і роль `app_user` (PostgreSQL слухає лише `localhost`);
+4. розкладає конфіги (`/etc/mywebapp/config.yaml`, `/etc/sudoers.d/operator`);
+5. встановлює systemd-юніти `mywebapp.service` + `mywebapp.socket`
+   (socket activation);
+6. запускає сервіс (із міграцією як `ExecStartPre`);
+7. налаштовує nginx (`/etc/nginx/sites-enabled/mywebapp`);
+8. створює `/home/student/gradebook` з числом `N`;
+9. блокує дефолтного cloud-користувача.
+
+## Користувачі та права
+
+| Користувач | Призначення                       | Доступ                                                        |
+|------------|-----------------------------------|---------------------------------------------------------------|
+| `student`  | Робота з проєктом                 | у групі `sudo`, пароль `12345678`, потрібна зміна на першому вході |
+| `teacher`  | Перевірка                         | у групі `sudo`, пароль `12345678`, потрібна зміна на першому вході |
+| `app`      | Запуск застосунку (`systemd`)     | системний, без shell, без home; читає `/etc/mywebapp/config.yaml`  |
+| `operator` | Керування сервісом                | `sudo` тільки на конкретні команди (див. `config/sudoers-operator`)|
+
+`operator` може виконувати рівно:
+
+```text
+sudo systemctl start|stop|restart|status mywebapp.service
+sudo systemctl start|stop|restart|status mywebapp.socket
+sudo systemctl reload|status nginx
+```
+
+## Тестування розгорнутої системи
+
+```bash
+# 1. Health probes на самому VM (назовні не пропускаються)
+curl -s http://127.0.0.1:3000/health/alive    # → OK
+curl -s http://127.0.0.1:3000/health/ready    # → OK
+
+# 2. Через nginx (порт 80) — лише дозволені ендпоінти
+curl -s http://127.0.0.1/                     # plain-HTML список ендпоінтів
+curl -sH 'Accept: application/json' http://127.0.0.1/tasks
+curl -sH 'Accept: text/html'        http://127.0.0.1/tasks   # HTML-таблиця
+
+curl -s -X POST http://127.0.0.1/tasks \
+     -H 'Content-Type: application/json' \
+     -d '{"title": "lab review"}'
+curl -s -X POST http://127.0.0.1/tasks/1/done
+
+# 3. nginx ховає health назовні
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1/health/alive   # → 404
+
+# 4. PostgreSQL слухає тільки localhost
+sudo ss -ltnp | grep ':5432'                  # 127.0.0.1:5432 only
+
+# 5. Socket activation
+systemctl status mywebapp.socket
+systemctl status mywebapp.service
+
+# 6. Перевірка обмежень operator
+sudo -u operator -i sudo systemctl restart mywebapp     # ✓
+sudo -u operator -i sudo systemctl reload  nginx        # ✓
+sudo -u operator -i sudo systemctl disable mywebapp     # ✗ (sudo denied)
+sudo -u operator -i sudo ls /root                       # ✗
+```
+
+## Структура репозиторію
+
+```
+.
+├── app/
+│   ├── database.py        # SQLAlchemy engine (config via /etc/mywebapp/config.yaml)
+│   ├── main.py            # FastAPI — endpoints per V3=2 + content negotiation
+│   ├── models.py          # Task (id, title, status, created_at)
+│   └── schemas.py         # Pydantic схеми
+├── scripts/
+│   ├── deploy.sh          # Єдина точка входу автоматизації (Ubuntu Server)
+│   └── migration.py       # Ідемпотентна міграція БД
+├── config/
+│   ├── config.yaml.example
+│   ├── mywebapp.service   # systemd service з socket activation
+│   ├── mywebapp.socket    # systemd socket на 127.0.0.1:3000
+│   ├── nginx.conf         # Reverse proxy, тільки дозволені ендпоінти
+│   └── sudoers-operator   # Обмежений sudo для operator
+├── requirements.txt
+└── README.md
+```

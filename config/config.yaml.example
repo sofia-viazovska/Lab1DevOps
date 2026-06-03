@@ -1,0 +1,7 @@
+# Example configuration for mywebapp.
+# Production location: /etc/mywebapp/config.yaml (owner root, mode 0640, group app)
+#
+# The application reads only `database_url`. The bind address/port for the HTTP
+# server is provided by systemd via socket activation (see mywebapp.socket).
+
+database_url: "postgresql+psycopg2://app_user:CHANGE_ME@127.0.0.1:5432/mywebapp"

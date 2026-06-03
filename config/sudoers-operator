@@ -1,0 +1,20 @@
+# /etc/sudoers.d/operator
+#
+# `operator` may only manage the mywebapp service/socket and reload nginx.
+# Anything else (disable/mask/edit, other services, shells) is denied.
+
+Cmnd_Alias MYWEBAPP_CTL = \
+    /usr/bin/systemctl start mywebapp.service, \
+    /usr/bin/systemctl stop mywebapp.service, \
+    /usr/bin/systemctl restart mywebapp.service, \
+    /usr/bin/systemctl status mywebapp.service, \
+    /usr/bin/systemctl start mywebapp.socket, \
+    /usr/bin/systemctl stop mywebapp.socket, \
+    /usr/bin/systemctl restart mywebapp.socket, \
+    /usr/bin/systemctl status mywebapp.socket
+
+Cmnd_Alias NGINX_RELOAD = \
+    /usr/bin/systemctl reload nginx, \
+    /usr/bin/systemctl status nginx
+
+operator ALL=(root) NOPASSWD: MYWEBAPP_CTL, NGINX_RELOAD

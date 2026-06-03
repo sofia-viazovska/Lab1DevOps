@@ -1,32 +1,45 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-import yaml
+"""Database engine and session factory.
+
+Configuration is loaded from a YAML file. The default location is
+``/etc/mywebapp/config.yaml`` (as required for variant V2=2). The path may be
+overridden with the ``APP_CONFIG_PATH`` environment variable, which is useful
+for local development and tests.
+
+Expected config format::
+
+    database_url: postgresql://user:password@127.0.0.1:5432/dbname
+"""
+
 import os
+from pathlib import Path
 
-# Priority: 1. Environment variable 2. Global config 3. Local config
-config_path = os.getenv("APP_CONFIG_PATH", "/etc/mywebapp/config.yaml")
-if not os.path.exists(config_path):
-    # Search relative to project root
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    local_config = os.path.join(base_dir, "config.yaml")
-    subdir_config = os.path.join(base_dir, "config", "config.yaml")
-    
-    if os.path.exists(local_config):
-        config_path = local_config
-    elif os.path.exists(subdir_config):
-        config_path = subdir_config
+import yaml
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-if os.path.exists(config_path):
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
-    database_url = config['database_url']
-else:
-    # Fallback to env var if config file not found
-    database_url = os.getenv("DATABASE_URL", "sqlite:///./test.db")
-    if "sqlite" in database_url:
-        print(f"Warning: Config file not found at {config_path}. Falling back to sqlite.")
+DEFAULT_CONFIG_PATH = "/etc/mywebapp/config.yaml"
 
-engine = create_engine(database_url, connect_args={"check_same_thread": False} if "sqlite" in database_url else {})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+def _load_database_url() -> str:
+    config_path = os.getenv("APP_CONFIG_PATH", DEFAULT_CONFIG_PATH)
+    path = Path(config_path)
+    if not path.is_file():
+        raise RuntimeError(
+            f"Configuration file not found at {config_path}. "
+            "Create it (see config/config.yaml.example) or set APP_CONFIG_PATH."
+        )
+
+    with path.open("r", encoding="utf-8") as fh:
+        config = yaml.safe_load(fh) or {}
+
+    database_url = config.get("database_url")
+    if not database_url:
+        raise RuntimeError(f"`database_url` is missing in {config_path}")
+    return database_url
+
+
+DATABASE_URL = _load_database_url()
+
+engine = create_engine(DATABASE_URL, future=True, pool_pre_ping=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, future=True)
 Base = declarative_base()

@@ -1,0 +1,12 @@
+[Unit]
+Description=mywebapp listening socket (Task Tracker)
+PartOf=mywebapp.service
+
+[Socket]
+# Bind only to loopback — the application is not reachable from outside the VM
+ListenStream=127.0.0.1:3000
+NoDelay=true
+Service=mywebapp.service
+
+[Install]
+WantedBy=sockets.target

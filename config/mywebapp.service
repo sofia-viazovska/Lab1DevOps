@@ -1,16 +1,30 @@
 [Unit]
-Description=Daily Task Tracker Service
+Description=mywebapp — Task Tracker (FastAPI)
 After=network.target postgresql.service
+Requires=mywebapp.socket postgresql.service
 
 [Service]
+Type=simple
 User=app
 Group=app
 WorkingDirectory=/opt/mywebapp
-# Migration before each run
-ExecStartPre=/usr/bin/python3 -m scripts.migration
-# Port 3000 according to variant V5=3
-ExecStart=/usr/bin/python3 -m uvicorn app.main:app --host 127.0.0.1 --port 3000
-Restart=always
+
+# Run DB migration before starting the application
+ExecStartPre=/opt/mywebapp/venv/bin/python -m scripts.migration
+
+# Socket activation: systemd passes the listening socket as fd 3.
+# uvicorn picks it up with `--fd 3`.
+ExecStart=/opt/mywebapp/venv/bin/python -m uvicorn app.main:app --fd 3
+
+Restart=on-failure
+RestartSec=3
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/log/mywebapp
 
 [Install]
 WantedBy=multi-user.target

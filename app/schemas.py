@@ -1,34 +1,21 @@
-from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
 
-class TaskBase(BaseModel):
+from pydantic import BaseModel, Field
+
+
+class TaskCreate(BaseModel):
+    """Payload for POST /tasks — per spec accepts only `title`."""
+
+    title: str = Field(..., min_length=1, max_length=255)
+
+
+class Task(BaseModel):
+    """Full task representation returned by the API."""
+
+    id: int
     title: str
-    description: Optional[str] = None
-    status: bool = False
-    priority: int = 1
-    deadline: Optional[datetime] = None
-    category_id: Optional[int] = None
-
-class TaskCreate(TaskBase):
-    pass
-
-class Task(TaskBase):
-    id: int
+    status: bool
     created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-class CategoryBase(BaseModel):
-    name: str
-    description: Optional[str] = None
-
-class CategoryCreate(CategoryBase):
-    pass
-
-class Category(CategoryBase):
-    id: int
 
     class Config:
         from_attributes = True
