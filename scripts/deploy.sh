@@ -56,11 +56,22 @@ log "2/9 Creating users"
 create_human_user() {
     local user="$1"
     if ! id "$user" >/dev/null 2>&1; then
-        useradd --create-home --shell /bin/bash --groups sudo "$user"
-        echo "${user}:12345678" | chpasswd
-        # Require a password change on first login
-        chage -d 0 "$user"
+        # If a system group with the same name already exists (e.g. Ubuntu's
+        # built-in 'operator' group, GID 37), reuse it as the primary group —
+        # otherwise useradd would refuse to create the user.
+        if getent group "$user" >/dev/null 2>&1; then
+            useradd --create-home --shell /bin/bash --gid "$user" --groups sudo "$user"
+        else
+            useradd --create-home --shell /bin/bash --groups sudo "$user"
+        fi
+    else
+        # User already exists (likely from a partial earlier run) — make sure
+        # they are at least in the sudo group.
+        usermod -aG sudo "$user" || true
     fi
+    # Always (re)set the default password and force a change at next login.
+    echo "${user}:12345678" | chpasswd
+    chage -d 0 "$user"
 }
 
 create_human_user student
