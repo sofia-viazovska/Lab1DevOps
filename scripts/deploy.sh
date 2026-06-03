@@ -126,7 +126,7 @@ python3 -m venv "${APP_DIR}/venv"
 # Config file (mode 0640, readable by `app` group)
 mkdir -p /etc/mywebapp
 cat >/etc/mywebapp/config.yaml <<EOF
-database_url: "postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@127.0.0.1:5432/${DB_NAME}"
+database_url: "postgresql+psycopg://${DB_USER}:${DB_PASSWORD}@127.0.0.1:5432/${DB_NAME}"
 EOF
 chown root:"${APP_USER}" /etc/mywebapp/config.yaml
 chmod 0640 /etc/mywebapp/config.yaml

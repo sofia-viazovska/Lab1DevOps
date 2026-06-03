@@ -54,25 +54,57 @@ curl -H 'Accept: text/html' http://<vm-ip>/
 curl -H 'Accept: text/html' http://<vm-ip>/tasks
 ```
 
-## Розробка
+## Розробка та локальний preview
 
-Вимоги: Python 3.10+, локальний PostgreSQL.
+### Швидкий локальний запуск через Docker (рекомендовано)
+
+Не вимагає Python, PostgreSQL чи будь-чого ще встановленого на хості — тільки
+Docker Desktop. Файли в `dev/` (Dockerfile, docker-compose, конфіги) служать
+**виключно** для попереднього перегляду в браузері і не є частиною
+лабораторної (продакшн-розгортання робиться через `scripts/deploy.sh` на ВМ).
 
 ```bash
-git clone <repo>
-cd Lab1DevOps
+docker compose -f dev/docker-compose.yaml up --build
+```
+
+Після старту (приблизно 1–2 хвилини на перший запуск) відкривай у браузері
+**http://localhost:8080/** — порт 80 контейнера з nginx прокинутий на 8080
+хоста. Побачиш plain-HTML список ендпоінтів і HTML-таблицю на `/tasks`.
+
+Зупинка з очищенням даних:
+
+```bash
+docker compose -f dev/docker-compose.yaml down -v
+```
+
+> Docker не запускає systemd, тому socket activation, `sudoers`-обмеження
+> operator-а, та блокування дефолтного користувача через цей шлях **не**
+> перевіряються. Для повної перевірки треба ВМ (див. розділ «Розгортання»).
+
+### Запуск без Docker (Python + локальний PostgreSQL)
+
+Вимоги: Python 3.10–3.13 (на 3.14 ще не зібрані бінарні wheel для деяких
+залежностей), локальний PostgreSQL.
+
+```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-# Конфіг для локального запуску
-cat > /tmp/mywebapp.yaml <<'EOF'
-database_url: "postgresql+psycopg2://user:password@127.0.0.1:5432/mywebapp_dev"
-EOF
+# Підняти БД і користувача (приклад для Homebrew PostgreSQL):
+createdb -h 127.0.0.1 mywebapp_dev
+psql -h 127.0.0.1 -d mywebapp_dev -c "CREATE USER app_user WITH PASSWORD 'devpass';"
+psql -h 127.0.0.1 -d mywebapp_dev -c "GRANT ALL ON DATABASE mywebapp_dev TO app_user;"
+psql -h 127.0.0.1 -d mywebapp_dev -c "GRANT ALL ON SCHEMA public TO app_user;"
 
-# Запуск міграції та сервера
-APP_CONFIG_PATH=/tmp/mywebapp.yaml python -m scripts.migration
-APP_CONFIG_PATH=/tmp/mywebapp.yaml python -m uvicorn app.main:app \
-    --host 127.0.0.1 --port 3000
+# Конфіг
+cat > /tmp/mywebapp.yaml <<'EOF'
+database_url: "postgresql+psycopg://app_user:devpass@127.0.0.1:5432/mywebapp_dev"
+EOF
+export APP_CONFIG_PATH=/tmp/mywebapp.yaml
+
+# Міграція + сервер
+python -m scripts.migration
+python -m uvicorn app.main:app --host 127.0.0.1 --port 3000
 ```
 
 ## Розгортання
@@ -195,6 +227,11 @@ sudo -u operator -i sudo ls /root                       # ✗
 │   ├── mywebapp.socket    # systemd socket на 127.0.0.1:3000
 │   ├── nginx.conf         # Reverse proxy, тільки дозволені ендпоінти
 │   └── sudoers-operator   # Обмежений sudo для operator
+├── dev/                   # Лише для локального preview (поза умовою лаби)
+│   ├── Dockerfile
+│   ├── docker-compose.yaml
+│   ├── config.yaml        # Конфіг для compose
+│   └── nginx.conf         # Конфіг nginx для compose
 ├── requirements.txt
 └── README.md
 ```

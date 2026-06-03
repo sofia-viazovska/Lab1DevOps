@@ -1,0 +1,46 @@
+# Quick local preview for browser-based smoke testing.
+#
+#   docker compose -f dev/docker-compose.yaml up --build
+#
+# Then open http://localhost:8080/
+#
+# NOTE: This file is NOT part of the lab submission. The real deployment target
+# is a Linux VM, see scripts/deploy.sh. Docker does not exercise systemd,
+# socket activation, sudoers, or user-locking — those still need a VM to test.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: devpass
+      POSTGRES_DB: mywebapp
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_user -d mywebapp"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: ..
+      dockerfile: dev/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./config.yaml:/etc/mywebapp/config.yaml:ro
+
+  nginx:
+    image: nginx:alpine
+    depends_on:
+      - app
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata:
